@@ -1,0 +1,183 @@
+#1 Install Pandas
+pip3 install pandas s3fs
+
+#2 Create Pandas Script
+nano pandas_analysis.py
+
+#3 Past the below script into pandas_analysis.py
+import pandas as pd
+import time
+
+print("Starting Pandas Analysis...")
+
+# ==========================================
+# Start Timing
+# ==========================================
+
+analysis_start = time.time()
+
+# ==========================================
+# Dictionaries for Aggregation
+# ==========================================
+
+genre_totals = {}
+publisher_totals = {}
+platform_totals = {}
+
+price_values = []
+revenue_values = []
+
+chunk_count = 0
+
+# ==========================================
+# Read Dataset in Chunks
+# ==========================================
+
+chunks = pd.read_csv(
+    "s3://ist3134-video-game-analysis/videogames_processed.csv",
+    chunksize=100000
+)
+
+for chunk in chunks:
+
+    chunk_count += 1
+
+    print(f"Processing Chunk {chunk_count}")
+
+    chunk = chunk.dropna(
+        subset=["estimated_revenue_usd"]
+    )
+
+    # ==========================================
+    # Revenue by Genre
+    # ==========================================
+
+    genre_group = (
+        chunk.groupby("genre")
+        ["estimated_revenue_usd"]
+        .sum()
+    )
+
+    for genre, revenue in genre_group.items():
+        genre_totals[genre] = (
+            genre_totals.get(genre, 0)
+            + revenue
+        )
+
+    # ==========================================
+    # Revenue by Publisher
+    # ==========================================
+
+    publisher_group = (
+        chunk.groupby("publisher")
+        ["estimated_revenue_usd"]
+        .sum()
+    )
+
+    for publisher, revenue in publisher_group.items():
+        publisher_totals[publisher] = (
+            publisher_totals.get(publisher, 0)
+            + revenue
+        )
+
+    # ==========================================
+    # Revenue by Platform
+    # ==========================================
+
+    platform_group = (
+        chunk.groupby("platform")
+        ["estimated_revenue_usd"]
+        .sum()
+    )
+
+    for platform, revenue in platform_group.items():
+        platform_totals[platform] = (
+            platform_totals.get(platform, 0)
+            + revenue
+        )
+
+    # ==========================================
+    # Correlation Data
+    # ==========================================
+
+    price_values.extend(
+        chunk["current_price_usd"].tolist()
+    )
+
+    revenue_values.extend(
+        chunk["estimated_revenue_usd"].tolist()
+    )
+
+# ==========================================
+# Final Results
+# ==========================================
+
+genre_revenue = (
+    pd.Series(genre_totals)
+    .sort_values(ascending=False)
+)
+
+publisher_revenue = (
+    pd.Series(publisher_totals)
+    .sort_values(ascending=False)
+)
+
+platform_revenue = (
+    pd.Series(platform_totals)
+    .sort_values(ascending=False)
+)
+
+correlation = (
+    pd.Series(price_values)
+    .corr(
+        pd.Series(revenue_values)
+    )
+)
+
+# ==========================================
+# Stop Timing
+# ==========================================
+
+analysis_end = time.time()
+
+total_pandas_time = (
+    analysis_end - analysis_start
+)
+
+# ==========================================
+# Output
+# ==========================================
+
+print("\n===================================")
+print("REVENUE BY GENRE")
+print("===================================")
+
+print(genre_revenue.head(10))
+
+print("\n===================================")
+print("REVENUE BY PUBLISHER")
+print("===================================")
+
+print(publisher_revenue.head(10))
+
+print("\n===================================")
+print("REVENUE BY PLATFORM")
+print("===================================")
+
+print(platform_revenue.head(10))
+
+print("\n===================================")
+print("PRICE VS REVENUE CORRELATION")
+print("===================================")
+
+print(correlation)
+
+print("\n===================================")
+print("TOTAL PANDAS EXECUTION TIME")
+print("===================================")
+
+print(total_pandas_time)
+
+print("\nAnalysis Completed Successfully")
+#4 Run Pandas
+python3 pandas_analysis.py
